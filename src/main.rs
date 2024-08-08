@@ -1,7 +1,7 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use std::fs;
-use std::io::{self, Read, read_to_string};
-use std::path::{Path, PathBuf};
+use std::io::{self, Read};
+use std::path::Path;
 
 fn read_dir_recursive(
     dir: &Path,
@@ -39,6 +39,52 @@ fn read_dir_recursive(
     Ok(())
 }
 
+fn topological_sort(dependencies: &HashMap<String, Vec<String>>) -> Result<Vec<String>, String>
+{
+    let mut in_degree = HashMap::new();
+    let mut zero_in_degree = VecDeque::new();
+
+    for (file, deps) in dependencies
+    {
+        for dep in deps
+        {
+            *in_degree.entry(dep.clone()).or_insert(0) += 1;
+        }
+        in_degree.entry(file.clone()).or_insert(0);
+    }
+    for (file, &degree) in &in_degree
+    {
+        if degree == 0
+        {
+            zero_in_degree.push_back(file.clone());
+        }
+    }
+    let mut sorted_files = Vec::new();
+    while let Some(file) = zero_in_degree.pop_front()
+    {
+        sorted_files.push(file.clone());
+        if let Some(deps) = dependencies.get(&file)
+        {
+            for dep in deps
+            {
+                if let Some(degree) = in_degree.get_mut(dep)
+                {
+                    *degree -= 1;
+                    if *degree == 0
+                    {
+                        zero_in_degree.push_back(dep.clone());
+                    }
+                }
+            }
+        }
+    }
+    if sorted_files.len() == in_degree.len()
+    {
+        Ok(sorted_files)
+    }
+    else { Err("Цикличная зависимость".to_string()) }
+}
+
 fn main() -> io::Result<()> {
     let mut files_content = HashMap::new();
     let mut dependencies = HashMap::new();
@@ -47,6 +93,17 @@ fn main() -> io::Result<()> {
     for (file, deps) in &dependencies
     {
         println!("Name: {}, Dependencies: {:?}", file, deps);
+    }
+    match topological_sort(&dependencies)
+    {
+        Ok(sorted_files) =>
+            {
+                println!("Отсортированные файлы: {:?}", sorted_files);
+            }
+        Err(err) =>
+            {
+                println!("Ошибка: {}", err)
+            }
     }
     Ok(())
 }
