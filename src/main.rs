@@ -1,6 +1,6 @@
 use std::collections::{HashMap, VecDeque};
 use std::fs;
-use std::io::{self, Read};
+use std::io::{self, Read, Write};
 use std::path::Path;
 
 fn read_dir_recursive(
@@ -52,6 +52,7 @@ fn topological_sort(dependencies: &HashMap<String, Vec<String>>) -> Result<Vec<S
         }
         in_degree.entry(file.clone()).or_insert(0);
     }
+
     for (file, &degree) in &in_degree
     {
         if degree == 0
@@ -59,6 +60,7 @@ fn topological_sort(dependencies: &HashMap<String, Vec<String>>) -> Result<Vec<S
             zero_in_degree.push_back(file.clone());
         }
     }
+
     let mut sorted_files = Vec::new();
     while let Some(file) = zero_in_degree.pop_front()
     {
@@ -78,6 +80,7 @@ fn topological_sort(dependencies: &HashMap<String, Vec<String>>) -> Result<Vec<S
             }
         }
     }
+
     if sorted_files.len() == in_degree.len()
     {
         Ok(sorted_files)
@@ -90,15 +93,18 @@ fn main() -> io::Result<()> {
     let mut dependencies = HashMap::new();
     read_dir_recursive(Path::new("./Folder"), &mut files_content, &mut dependencies)?;
 
-    for (file, deps) in &dependencies
-    {
-        println!("Name: {}, Dependencies: {:?}", file, deps);
-    }
     match topological_sort(&dependencies)
     {
         Ok(sorted_files) =>
             {
-                println!("Отсортированные файлы: {:?}", sorted_files);
+                let mut output = String::new();
+                for file in sorted_files
+                {
+                    output.push_str(&files_content[&file]);
+                    output.push('\n');
+                }
+                let mut output_file = fs::File::create("output.txt")?;
+                output_file.write_all(output.as_bytes())?;
             }
         Err(err) =>
             {
